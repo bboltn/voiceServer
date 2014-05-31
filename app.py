@@ -4,6 +4,7 @@ Let your voice be heard
 '''
 import bottle
 import json
+import pickle
 from votesmart import votesmart
 from bottle.ext import redis as redis_plugin
 
@@ -13,7 +14,6 @@ votesmart.apikey = APIKEY
 # setup app
 app = application = bottle.Bottle()
 app.autojson = True
-#bottle.default_app().autojson
 
 # setup plugin
 plugin = redis_plugin.RedisPlugin(host='localhost')
@@ -29,15 +29,13 @@ def get_official_by_zip(zipcode, rdb):
     
     result = rdb.get(key)
 
-    if result:
-        return result
+    if not result:
+        result = votesmart.officials.getByZip(zipcode)
+        rdb.set(key, pickle.dumps(result))
+        rdb.expire(key, 60 * 60 * 24)
+    else:
+        result = pickle.loads(result)
     
-    result = votesmart.officials.getByZip(zipcode)
-
-    result = json.dumps(result, default=lambda o: o.__dict__)
-
-    rdb.set(key, result)
-
     return result
 
 
@@ -45,42 +43,27 @@ def get_official_by_zip(zipcode, rdb):
 def officials(category, zipcode, rdb):
     results = get_official_by_zip(zipcode, rdb)
 
-    filter = filters_funcs.get(category)
+    filter_values = filter_lookup.get(category)
 
-    if not filter:
+    if not filter_values:
         return
 
-    return filter(results)
+    return json.dumps(filter_results(results, filter_values), default=lambda o: o.__dict__)
 
 
 # FILTERS
-def us_senate_filter(results):
-    return results
+def filter_results(results, filter_values):
+    return [i for i in results if i.__dict__.get(filter_values[0]) == filter_values[1]]
 
 
-def us_house_filter(results):
-    return results
-
-
-def state_senate_filter(results):
-    return results
-
-
-def state_house_filter(results):
-    return results
-
-
-def governor_filter(results):
-    return results
-
-
-filters_funcs = {
-    'USSenate': us_senate_filter,
-    'USHouse': us_house_filter,
-    'StateSenate': state_senate_filter,
-    'StateHouse': state_house_filter,
-    'Governor': governor_filter
+filter_lookup = {
+    'USSenate': ['officeName', 'U.S. Senate'],
+    'USHouse': ['officeName', 'U.S. House'],
+    'StateSenate': ['officeName', 'State Senate'],
+    'StateHouse': ['officeName', 'State House'],
+    'Governor': ['officeTypeId', 'G']
 }
+
 
 # SERVE UP STATIC DATA
 @app.route('/static/<filename:path>')
@@ -90,6 +73,7 @@ def static(filename):
     '''
     return bottle.static_file(
         filename, root='{}/static'.format(conf.get('bottle', 'root_path')))
+
 
 # HELPERS
 class StripPathMiddleware(object):
@@ -101,6 +85,7 @@ class StripPathMiddleware(object):
     def __call__(self, e, h):
         e['PATH_INFO'] = e['PATH_INFO'].rstrip('/')
         return self.a(e, h)
+
 
 # SERVER START
 if __name__ == '__main__':
