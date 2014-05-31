@@ -39,6 +39,11 @@ def get_official_by_zip(zipcode, rdb):
     return result
 
 
+@app.route('/')
+def home():
+    return 'everything is running'
+
+
 @app.route('/officials/<category>/<zipcode>')
 def officials(category, zipcode, rdb):
     results = get_official_by_zip(zipcode, rdb)
