@@ -6,7 +6,6 @@ Let your voice be heard - server
 ## Requirements
 
 - Pip
-- Homebrew
 - virtual env
 
 ## Install
