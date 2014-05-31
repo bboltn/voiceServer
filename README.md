@@ -23,3 +23,16 @@ pip install -r requirements.txt
 - to enter virtual env type `source bin/activate`
 - to leave virtual env type `deactivate`
 - if you install anything with pip install make sure you save these new requirements in requirements.txt.  Type `pip freeze > requirements.txt`
+
+
+## REST End Points
+```
+
+http://api.kashew.net
+
+/officials/USSenate/<zip>
+/officials/USHouse/<zip>
+/officials/Governor/<zip>
+/officials/StateHouse/<zip>
+/officials/StateSenate/<zip>
+```
