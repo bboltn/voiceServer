@@ -1,2 +1,4 @@
 bottle==0.12.7
+bottle-redis==0.2.1
+redis==2.9.1
 wsgiref==0.1.2

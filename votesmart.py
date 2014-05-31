@@ -209,6 +209,7 @@ class votesmart(object):
         params = dict([(k,v) for (k,v) in params.iteritems() if v])
         url = 'http://api.votesmart.org/%s?o=JSON&key=%s&%s' % (func,
             votesmart.apikey, urllib.urlencode(params))
+        print url
         try:
             response = urllib2.urlopen(url).read()
             obj = json.loads(response)
