@@ -35,4 +35,9 @@ http://api.kashew.net
 /officials/Governor/<zip>
 /officials/StateHouse/<zip>
 /officials/StateSenate/<zip>
+/officials/Local/<zip>
+/candidate/<candidateId>
+
+#you can also get multiple candidates by seperating ids with periods
+/candidate/<candidateId.candidateId.candidateId.candidateId>
 ```
