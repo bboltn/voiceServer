@@ -5,6 +5,8 @@ Let your voice be heard
 import bottle
 import json
 import pickle
+import urllib
+import os
 from votesmart import votesmart
 from bottle.ext import redis as redis_plugin
 
@@ -51,13 +53,27 @@ def get_candidate_info(candidates, rdb):
     results = rdb.get(redis_key)
 
     if not results:
-        results = [votesmart.address.getOffice(id) for id in candidate_list]
+        results = []
+        for id in candidate_list:
+            candidate = votesmart.address.getOffice(id)
+            for c in candidate:
+                setattr(c, 'imageurl',
+                        'http://api.kashew.net/static/%s.jpg' % id)
+                setattr(c, 'candidateId', id)
+                download_image(id)
+            results.append(candidate)
+
         rdb.set(redis_key, pickle.dumps(results))
         rdb.expire(redis_key, ONEDAY)
     else:
         results = pickle.loads(results)
 
     return results
+
+
+def download_image(id):
+    image_url = 'http://votesmart.org/canphoto/%s.jpg' % id
+    urllib.urlretrieve(image_url, "%s/%s.jpg" % ('static', id))
 
 
 @app.route('/')
@@ -74,12 +90,14 @@ def officials(category, zipcode, rdb):
     if not filter_values:
         return
 
-    return json.dumps(filter_results(results, filter_values), default=lambda o: o.__dict__)
+    return json.dumps(filter_results(results, filter_values),
+                      default=lambda o: o.__dict__)
 
 
 @app.route('/candidate/<candidates>')
 def candidate(candidates, rdb):
-    #candidates is a csv list
+    # candidates is a list of candidate ids seperated by a period.  
+    # Example: 7826.7790
     results = get_candidate_info(candidates, rdb)
 
     return json.dumps(results, default=lambda o: o.__dict__)
@@ -87,7 +105,8 @@ def candidate(candidates, rdb):
 
 # FILTERS
 def filter_results(results, filter_values):
-    return [i for i in results if i.__dict__.get(filter_values[0]) == filter_values[1]]
+    return [i for i in results 
+        if i.__dict__.get(filter_values[0]) == filter_values[1]]
 
 
 filter_lookup = {
@@ -105,8 +124,9 @@ def static(filename):
     '''
     Serve static files
     '''
+    #the_path = '{}/static'.format(conf.get('bottle', 'root_path'))
     return bottle.static_file(
-        filename, root='{}/static'.format(conf.get('bottle', 'root_path')))
+        filename, root='static')
 
 
 # HELPERS
