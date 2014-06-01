@@ -143,6 +143,10 @@ def get_locals_by_zip(zipcode, rdb):
             return
 
         results = votesmart.local.getOfficials(localId)
+        for r in results:
+            setattr(r, 'imageurl', 'http://api.kashew.net/static/%s.jpg' % r.candidateId)
+            download_image(r.candidateId)
+
         rdb.set(key, pickle.dumps(results))
         rdb.expire(key, TIME_TO_EXPIRE)
     else:
