@@ -7,6 +7,7 @@ import json
 import pickle
 import urllib
 import requests
+import os.path
 
 from bs4 import BeautifulSoup
 
@@ -165,6 +166,10 @@ def get_county_name(entries, shortest=False):
         return
 
 def download_image(id):
+    file_location = 'static/%s.jpg' % id
+    if os.path.isfile(file_location):
+        return
+
     image_url = 'http://votesmart.org/canphoto/%s.jpg' % id
     urllib.urlretrieve(image_url, "%s/%s.jpg" % ('static', id))
 
@@ -190,8 +195,13 @@ def officials(category, zipcode, rdb):
     if not filter_values:
         return
 
-    return json.dumps(filter_results(results, filter_values),
-                      default=lambda o: o.__dict__)
+    filtered_results = filter_results(results, filter_values)
+
+    for c in filtered_results:
+        download_image(c.candidateId)
+        setattr(c, 'imageurl', 'http://api.kashew.net/static/%s.jpg' % c.candidateId)
+
+    return json.dumps(filtered_results, default=lambda o: o.__dict__)
 
 
 @app.route('/candidate/<candidates>')
