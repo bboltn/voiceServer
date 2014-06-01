@@ -1,3 +1,4 @@
+beautifulsoup4==4.1.3
 bottle==0.12.7
 bottle-redis==0.2.1
 redis==2.9.1

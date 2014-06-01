@@ -8,6 +8,8 @@ import pickle
 import urllib
 import requests
 
+from bs4 import BeautifulSoup
+
 from votesmart import votesmart
 from bottle.ext import redis as redis_plugin
 
@@ -83,24 +85,58 @@ def get_locals_by_zip(zipcode, rdb):
         city_name = ''
         state_id = ''
 
-        try:
-            city_name = result.json().get('results')[0].get('address_components')[1].get('long_name')
-            state_id = result.json().get('results')[0].get('address_components')[3].get('short_name')
-        except:
+        results = result.json().get('results')
+        if not isinstance(results, list):
             return
+
+        address_components = results[0].get('address_components')
+        for a in address_components:
+            if not a['short_name'] or not a['types']:
+                continue
+            if 'locality' in a['types']:
+                city_name = a['short_name']
+            if 'administrative_area_level_1' in a['types']:
+                state_id = a['short_name']
+            if city_name and state_id:
+                break
 
         if not city_name or not state_id:
             return
 
+        print 'info!!!!!!!'
+        print state_id
+        print city_name
         cities = votesmart.local.getCities(state_id)
-        if not cities:
-            return
-
         locality = filter(lambda local: local.name == city_name, cities)
         if not locality:
+            geonames_url = 'http://www.geonames.org/search.html?q=%s&country=US' % zipcode
+            print geonames_url
+            result = requests.get(geonames_url)
+            county_name = get_county_name(result.text)
+            if not county_name:
+                county_name = get_county_name(result.text, True)
+                if not county_name:
+                    return
+
+            print 'county_name' + county_name
+
+            counties = votesmart.local.getCounties(state_id)
+            if not counties:
+                print 'no counties'
+                return
+
+            locality = filter(lambda local: local.name == county_name, counties)
+
+            if not locality:
+                locality = filter(lambda local: county_name in local.name, counties)
+
+        print locality
+        if not isinstance(locality, list):
+            print 'no locality'
             return
 
         localId = locality[0].localId
+        print localId
 
         if not localId:
             return
@@ -113,6 +149,20 @@ def get_locals_by_zip(zipcode, rdb):
 
     return results
 
+def get_county_name(entries, shortest=False):
+    soup = BeautifulSoup(entries)
+    smalls = soup("small")
+    potentials = []
+    for s in smalls:
+        if s.string and 'county' in s.string.lower():
+            potentials.append(s.string)
+
+    if shortest:
+        return min(potentials, key=len)
+    elif isinstance(potentials, list):
+        potentials[0]
+    else:
+        return
 
 def download_image(id):
     image_url = 'http://votesmart.org/canphoto/%s.jpg' % id
