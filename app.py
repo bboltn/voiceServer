@@ -64,8 +64,7 @@ def get_candidate_info(candidates, rdb):
         for id in candidate_list:
             candidate = votesmart.address.getOffice(id)
             for c in candidate:
-                setattr(c, 'imageurl',
-                        'http://api.kashew.net/static/%s.jpg' % id)
+                setattr(c, 'imageurl', 'http://api.kashew.net/static/%s.jpg' % id)
                 setattr(c, 'candidateId', id)
                 download_image(id)
             results.append(candidate)
@@ -104,14 +103,10 @@ def get_locals_by_zip(zipcode, rdb):
         if not city_name or not state_id:
             return
 
-        print 'info!!!!!!!'
-        print state_id
-        print city_name
         cities = votesmart.local.getCities(state_id)
         locality = filter(lambda local: local.name == city_name, cities)
         if not locality:
             geonames_url = 'http://www.geonames.org/search.html?q=%s&country=US' % zipcode
-            print geonames_url
             result = requests.get(geonames_url)
             county_name = get_county_name(result.text)
             if not county_name:
@@ -119,11 +114,8 @@ def get_locals_by_zip(zipcode, rdb):
                 if not county_name:
                     return
 
-            print 'county_name' + county_name
-
             counties = votesmart.local.getCounties(state_id)
             if not counties:
-                print 'no counties'
                 return
 
             locality = filter(lambda local: local.name == county_name, counties)
@@ -131,13 +123,10 @@ def get_locals_by_zip(zipcode, rdb):
             if not locality:
                 locality = filter(lambda local: county_name in local.name, counties)
 
-        print locality
         if not isinstance(locality, list):
-            print 'no locality'
             return
 
         localId = locality[0].localId
-        print localId
 
         if not localId:
             return
