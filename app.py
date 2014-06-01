@@ -6,18 +6,22 @@ import bottle
 import json
 import pickle
 import urllib
-import os
+import requests
+
 from votesmart import votesmart
 from bottle.ext import redis as redis_plugin
 
-ONEDAY = 60 * 60 * 24
+# CONSTANTS
+TIME_TO_EXPIRE = 60 * 60 * 24
+VOTE_SMART_API_KEY = '243e0b6d69b73e6986243a50e7a68a0c'
 
-APIKEY = '243e0b6d69b73e6986243a50e7a68a0c'
-votesmart.apikey = APIKEY
+# API Setup
+votesmart.apikey = VOTE_SMART_API_KEY
 
 # setup app
 app = application = bottle.Bottle()
 app.autojson = True
+
 
 # setup plugin
 plugin = redis_plugin.RedisPlugin(host='localhost')
@@ -30,16 +34,16 @@ def create_key(operation, zipcode):
 
 def get_official_by_zip(zipcode, rdb):
     key = create_key('Officials.getByZip', zipcode)
-    
+
     result = rdb.get(key)
 
     if not result:
         result = votesmart.officials.getByZip(zipcode)
         rdb.set(key, pickle.dumps(result))
-        rdb.expire(key, ONEDAY)
+        rdb.expire(key, TIME_TO_EXPIRE)
     else:
         result = pickle.loads(result)
-    
+
     return result
 
 
@@ -64,7 +68,46 @@ def get_candidate_info(candidates, rdb):
             results.append(candidate)
 
         rdb.set(redis_key, pickle.dumps(results))
-        rdb.expire(redis_key, ONEDAY)
+        rdb.expire(redis_key, TIME_TO_EXPIRE)
+    else:
+        results = pickle.loads(results)
+
+    return results
+
+def get_locals_by_zip(zipcode, rdb):
+    key = 'get_locals_by_zip.%s' % zipcode
+    results = rdb.get(key)
+    if not results:
+        google_url = 'http://maps.googleapis.com/maps/api/geocode/json?address=%s' % zipcode
+        result = requests.get(google_url)
+        city_name = ''
+        state_id = ''
+
+        try:
+            city_name = result.json().get('results')[0].get('address_components')[1].get('long_name')
+            state_id = result.json().get('results')[0].get('address_components')[3].get('short_name')
+        except:
+            return
+
+        if not city_name or not state_id:
+            return
+
+        cities = votesmart.local.getCities(state_id)
+        if not cities:
+            return
+
+        locality = filter(lambda local: local.name == city_name, cities)
+        if not locality:
+            return
+
+        localId = locality[0].localId
+
+        if not localId:
+            return
+
+        results = votesmart.local.getOfficials(localId)
+        rdb.set(key, pickle.dumps(results))
+        rdb.expire(key, TIME_TO_EXPIRE)
     else:
         results = pickle.loads(results)
 
@@ -76,9 +119,16 @@ def download_image(id):
     urllib.urlretrieve(image_url, "%s/%s.jpg" % ('static', id))
 
 
+#ROUTES
 @app.route('/')
 def home():
     return 'everything is running'
+
+
+@app.route('/officials/Local/<zipcode>')
+def officials_local(zipcode, rdb):
+    results = get_locals_by_zip(zipcode, rdb)
+    return json.dumps(results, default=lambda o: o.__dict__)
 
 
 @app.route('/officials/<category>/<zipcode>')
@@ -105,7 +155,7 @@ def candidate(candidates, rdb):
 
 # FILTERS
 def filter_results(results, filter_values):
-    return [i for i in results 
+    return [i for i in results
         if i.__dict__.get(filter_values[0]) == filter_values[1]]
 
 
@@ -124,9 +174,7 @@ def static(filename):
     '''
     Serve static files
     '''
-    #the_path = '{}/static'.format(conf.get('bottle', 'root_path'))
-    return bottle.static_file(
-        filename, root='static')
+    return bottle.static_file(filename, root='static')
 
 
 # HELPERS
@@ -144,6 +192,5 @@ class StripPathMiddleware(object):
 # SERVER START
 if __name__ == '__main__':
     bottle.run(app=StripPathMiddleware(app),
-        #server='python_server',
         host='localhost',
         port=8888)
