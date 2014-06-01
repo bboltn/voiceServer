@@ -63,9 +63,11 @@ def get_candidate_info(candidates, rdb):
         results = []
         for id in candidate_list:
             candidate = votesmart.address.getOffice(id)
+            more_candidate = votesmart.address.getOfficeWebAddress(id)
             for c in candidate:
                 setattr(c, 'imageurl', 'http://api.kashew.net/static/%s.jpg' % id)
                 setattr(c, 'candidateId', id)
+                setattr(c, 'webAddress', more_candidate)
                 download_image(id)
             results.append(candidate)
 
