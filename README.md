@@ -1,5 +1,8 @@
 Let your voice be heard - server
 -----------------------------------------------------------
+
+This project was created in 24 hours during the national day of civic hacking
+
 ## Rest end points and webapp
 
 
